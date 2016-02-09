@@ -22,6 +22,7 @@ var _initialNotification = RCTPushNotificationManager &&
 
 var DEVICE_NOTIF_EVENT = 'remoteNotificationReceived';
 var NOTIF_REGISTER_EVENT = 'remoteNotificationsRegistered';
+var DEVICE_LOCAL_NOTIF_EVENT = 'localNotificationReceived';
 
 /**
  * Handle push notifications for your app, including permission handling and
@@ -60,6 +61,11 @@ var NOTIF_REGISTER_EVENT = 'remoteNotificationsRegistered';
  *    {
  *     [RCTPushNotificationManager didReceiveRemoteNotification:notification];
  *    }
+ *    // Required for the localNotification event.
+ *    - (void)application:(UIApplication *)application didReceiveLocalNotification:(UILocalNotification *)notification
+ *    {
+ *     [RCTPushNotificationManager didReceiveLocalNotification:notification];
+ *    }
  *   ```
  */
 class PushNotificationIOS {
@@ -75,7 +81,6 @@ class PushNotificationIOS {
    *
    * - `alertBody` : The message displayed in the notification alert.
    * - `soundName` : The sound played when the notification is fired (optional).
-   *
    */
   static presentLocalNotification(details: Object) {
     RCTPushNotificationManager.presentLocalNotification(details);
@@ -89,7 +94,7 @@ class PushNotificationIOS {
    * - `fireDate` : The date and time when the system should deliver the notification.
    * - `alertBody` : The message displayed in the notification alert.
    * - `soundName` : The sound played when the notification is fired (optional).
-   *
+   * - `userInfo` : An optional object containing additional notification data.
    */
   static scheduleLocalNotification(details: Object) {
     RCTPushNotificationManager.scheduleLocalNotification(details);
@@ -117,6 +122,17 @@ class PushNotificationIOS {
   }
 
   /**
+   * Cancel local notifications.
+   *
+   * Optionally restricts the set of canceled notifications to those
+   * notifications whose `userInfo` fields match the corresponding fields
+   * in the `userInfo` argument.
+   */
+  static cancelLocalNotifications(userInfo: Object) {
+    RCTPushNotificationManager.cancelLocalNotifications(userInfo);
+  }
+
+  /**
    * Attaches a listener to remote notification events while the app is running
    * in the foreground or the background.
    *
@@ -129,13 +145,20 @@ class PushNotificationIOS {
    */
   static addEventListener(type: string, handler: Function) {
     invariant(
-      type === 'notification' || type === 'register',
-      'PushNotificationIOS only supports `notification` and `register` events'
+      type === 'notification' || type === 'register' || type === 'localNotification',
+      'PushNotificationIOS only supports `notification`, `register` and `localNotification` events'
     );
     var listener;
     if (type === 'notification') {
       listener =  RCTDeviceEventEmitter.addListener(
         DEVICE_NOTIF_EVENT,
+        (notifData) => {
+          handler(new PushNotificationIOS(notifData));
+        }
+      );
+    } else if (type === 'localNotification') {
+      listener = RCTDeviceEventEmitter.addListener(
+        DEVICE_LOCAL_NOTIF_EVENT,
         (notifData) => {
           handler(new PushNotificationIOS(notifData));
         }
@@ -221,8 +244,8 @@ class PushNotificationIOS {
    */
   static removeEventListener(type: string, handler: Function) {
     invariant(
-      type === 'notification' || type === 'register',
-      'PushNotificationIOS only supports `notification` and `register` events'
+      type === 'notification' || type === 'register' || type === 'localNotification',
+      'PushNotificationIOS only supports `notification`, `register` and `localNotification` events'
     );
     var listener = _notifHandlers.get(handler);
     if (!listener) {
